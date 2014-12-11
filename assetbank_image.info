@@ -1,0 +1,6 @@
+name = AssetBank Image
+description = Provides an AssetBank Image field.
+package = Field
+core = 7.x
+dependencies[] = field
+configure = admin/config/media/assetbank-image-styles

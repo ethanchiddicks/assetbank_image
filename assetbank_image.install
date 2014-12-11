@@ -1,0 +1,75 @@
+<?php
+
+/**
+ * @file
+ * Install, update and uninstall functions for the AssetBank image module.
+ */
+
+/**
+ * Implements hook_install().
+ */
+function assetbank_image_install() {
+  variable_set(
+    'assetbank_image_image_styles',
+    array(
+      'default' => array(
+        'name' => 'default',
+        'label' => 'Default',
+        'width' => '200',
+        'height' => '200',
+        'preserve_aspect' => TRUE,
+        'crop_to_fit' => FALSE,
+        'fill_background' => FALSE,
+        'fill_background_hexcode' => '000000',
+      ),
+    )
+  );
+
+  variable_set(
+    'assetbank_image_instances',
+    array(
+      'abdemo' => array(
+        'name' => 'abdemo',
+        'label' => 'AssetBank Demo',
+        'url' => 'http://demo.assetbank.co.uk/assetbank-standard',
+      ),
+    )
+  );
+}
+
+/**
+ * Implements hook_field_schema().
+ */
+function assetbank_image_field_schema($field) {
+  return array(
+    'columns' => array(
+      'assetbank_asset_id' => array(
+        'description' => 'The AssetBank Asset ID for this image.',
+        'type' => 'int',
+        'not null' => FALSE,
+        'unsigned' => TRUE,
+      ),
+      'assetbank_instance_name' => array(
+        'description' => 'The AssetBank instance machine name.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+      ),
+      'alt' => array(
+        'description' => "Alternative image text, for the image's 'alt' attribute.",
+        'type' => 'varchar',
+        'length' => 512,
+        'not null' => FALSE,
+      ),
+      'title' => array(
+        'description' => "Image title text, for the image's 'title' attribute.",
+        'type' => 'varchar',
+        'length' => 1024,
+        'not null' => FALSE,
+      ),
+    ),
+    'indexes' => array(
+      'assetbank_asset_id' => array('assetbank_asset_id'),
+    ),
+  );
+}

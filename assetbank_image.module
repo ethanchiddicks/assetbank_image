@@ -1,0 +1,352 @@
+<?php
+
+/**
+ * @file
+ * Allows AssetBank images to be added to fieldable entities.
+ */
+
+// Load all Field module hooks for AssetBank Image.
+module_load_include('inc', 'assetbank_image', 'assetbank_image.field');
+
+/**
+ * Implements hook_menu().
+ */
+function assetbank_image_menu() {
+  $items = array();
+  $items['admin/config/media/assetbank'] = array(
+    'title' => 'AssetBank Configuration',
+    'description' => 'Configure settings for Assetbank integration.',
+    'page callback' => 'assetbank_instance_list',
+    'access arguments' => array('administer AssetBank'),
+    'file' => 'assetbank_image.admin.inc',
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/config/media/assetbank/list'] = array(
+    'title' => 'AssetBank Instances',
+    'description' => 'Configure AssetBank instances.',
+    'page callback' => 'assetbank_instance_list',
+    'access arguments' => array('administer AssetBank'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 1,
+    'file' => 'assetbank_image.admin.inc',
+  );
+  $items['admin/config/media/assetbank/add'] = array(
+    'title' => 'Add AssetBank Instance',
+    'description' => 'Add a new AssetBank instance.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('assetbank_instance_form'),
+    'access arguments' => array('administer AssetBank'),
+    'type' => MENU_LOCAL_ACTION,
+    'weight' => 2,
+    'file' => 'assetbank_image.admin.inc',
+  );
+  $items['admin/config/media/assetbank/edit/%assetbank_instance'] = array(
+    'title' => 'Edit AssetBank Instance',
+    'description' => 'Configure an AssetBank instance.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('assetbank_instance_form', 5),
+    'access arguments' => array('administer AssetBank'),
+    'file' => 'assetbank_image.admin.inc',
+  );
+  $items['admin/config/media/assetbank/delete/%assetbank_instance'] = array(
+    'title' => 'Delete instance',
+    'description' => 'Delete an AssetBank instance.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('assetbank_instance_delete_form', 5),
+    'access arguments' => array('administer AssetBank'),
+    'file' => 'assetbank_image.admin.inc',
+  );
+
+  $items['admin/config/media/assetbank/assetbank-image-styles'] = array(
+    'title' => 'AssetBank Image Styles',
+    'description' => 'Configure styles that can be used for resizing images on display.',
+    'page callback' => 'assetbank_image_style_list',
+    'access arguments' => array('administer AssetBank'),
+    'file' => 'assetbank_image.admin.inc',
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 3,
+  );
+  $items['admin/config/media/assetbank/assetbank-image-styles/list'] = array(
+    'title' => 'AssetBank Image Styles',
+    'description' => 'Configure styles that can be used for resizing images on display.',
+    'page callback' => 'assetbank_image_style_list',
+    'access arguments' => array('administer AssetBank'),
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 3,
+    'file' => 'assetbank_image.admin.inc',
+  );
+  $items['admin/config/media/assetbank/assetbank-image-styles/add'] = array(
+    'title' => 'Add AssetBank Image Style',
+    'description' => 'Add a new AssetBank Image Style.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('assetbank_image_style_form'),
+    'access arguments' => array('administer AssetBank'),
+    'type' => MENU_LOCAL_ACTION,
+    'weight' => 2,
+    'file' => 'assetbank_image.admin.inc',
+  );
+  $items['admin/config/media/assetbank/assetbank-image-styles/edit/%assetbank_image_style'] = array(
+    'title' => 'Edit AssetBank Image Style',
+    'description' => 'Configure an AssetBank Image Style.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('assetbank_image_style_form', 6),
+    'access arguments' => array('administer AssetBank'),
+    'file' => 'assetbank_image.admin.inc',
+  );
+  $items['admin/config/media/assetbank/assetbank-image-styles/delete/%assetbank_image_style'] = array(
+    'title' => 'Delete AssetBank Image Style',
+    'description' => 'Delete an AssetBank Image Style.',
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('assetbank_image_style_delete_form', 6),
+    'access arguments' => array('administer AssetBank'),
+    'file' => 'assetbank_image.admin.inc',
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_theme().
+ */
+function assetbank_image_theme() {
+  return array(
+    'assetbank_image_style' => array(
+      'variables' => array(
+        'style_name' => NULL,
+        'width' => NULL,
+        'height' => NULL,
+        'alt' => '',
+        'title' => NULL,
+        'attributes' => array(),
+      ),
+    ),
+    'assetbank_image_style_list' => array(
+      'variables' => array('styles' => NULL),
+    ),
+    'assetbank_instance_list' => array(
+      'variables' => array('instances' => NULL),
+    ),
+    'assetbank_image_formatter' => array(
+      'variables' => array(
+        'item' => NULL,
+        'path' => NULL,
+        'assetbank_image_style' => NULL,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_permission().
+ */
+function assetbank_image_permission() {
+  return array(
+    'administer AssetBank' => array(
+      'title' => t('Administer AssetBank'),
+      'description' => t('Manipulate settings for AssetBank integration.'),
+    ),
+  );
+}
+
+/**
+ * Gets an array of all styles and their settings.
+ *
+ * @return array
+ *   An array of styles keyed by the image style ID (abisid).
+ * @see assetbank_image_style_load()
+ */
+function assetbank_image_styles() {
+  $styles = &drupal_static(__FUNCTION__);
+
+  // Grab from cache or build the array.
+  if (!isset($styles)) {
+    $styles = variable_get('assetbank_image_image_styles');
+  }
+
+  return $styles;
+}
+
+/**
+ * Loads a style by style name.
+ *
+ * May be used as a loader for menu items.
+ *
+ * @param string $name
+ *   The name of the style.
+ *
+ * @return array
+ *   An image style array containing the following keys:
+ *   - "abisid": The unique image style ID.
+ *   - "name": The unique image style name.
+ *   If the image style name or ID is not valid, an empty array is returned.
+ * @see assetbank_image_effect_load()
+ */
+function assetbank_image_style_load($name = NULL) {
+  $styles = assetbank_image_styles();
+
+  // If retrieving by name.
+  if (isset($name) && isset($styles[$name])) {
+    $styles[$name]['name'] = $name;
+    return $styles[$name];
+  }
+
+  // Otherwise the style was not found.
+  return FALSE;
+}
+
+/**
+ * Gets an array of image styles suitable for using as select list options.
+ *
+ * @return array
+ *   Array of image styles with the machine name as key and the label as value.
+ */
+function assetbank_image_style_options() {
+  $styles = assetbank_image_styles();
+  $options = array();
+
+  foreach ($styles as $name => $style) {
+    $options[$name] = $style['label'];
+  }
+
+  return $options;
+}
+
+/**
+ * Returns the URL for an image derivative given a style and image path.
+ *
+ * @param string $instance_name
+ *   The AssetBank Instance to use for this image.
+ * @param string $asset_id
+ *   The AssetBank Asset ID of this image.
+ * @param string $style_name
+ *   The name of the AssetBank Image Style to use for this image.
+ *
+ * @return string
+ *   The absolute URL for the AssetBank Image, suitable for embedding.
+ */
+function assetbank_image_style_url($instance_name, $asset_id, $style_name) {
+  // Retrieve instance information.
+  $instances = assetbank_instances();
+  $instance = $instances[$instance_name];
+
+  // Retrieve style information.
+  $styles = assetbank_image_styles();
+  $style = $styles[$style_name];
+
+  $options = array();
+
+  $query = array(
+    'assetId' => $asset_id,
+    'width' => $style['width'],
+    'height' => $style['height'],
+  );
+
+  // Convert 1/0 values to strings.
+  $query['preserveAspectRatio'] = $style['preserve_aspect'] ? 'true' : 'false';
+  $query['cropToFit'] = $style['crop_to_fit'] ? 'true' : 'false';
+
+  if ($style['fill_background']) {
+    $query['fillBackground'] = 'true';
+    $query['fillBackgroundColour'] = $style['fill_background_hexcode'];
+  }
+  else {
+    $query['fillBackground'] = 'false';
+  }
+
+  $options['query'] = $query;
+  $options['external'] = TRUE;
+
+  $url = $instance['url'] . '/action/directLinkImage';
+
+  return url($url, $options);
+}
+
+/**
+ * Returns HTML for an image using a specific image style.
+ *
+ * @param array $variables
+ *   An associative array containing:
+ *   - assetbank_name: The AssetBank Instance name.
+ *   - asset_id: The AssetBank Asset ID of the image.
+ *   - style_name: The name of the style to be used to alter the original image.
+ *   - width: The width of the source image (if known).
+ *   - height: The height of the source image (if known).
+ *   - alt: The alternative text for text-based browsers.
+ *   - title: The title text is displayed when the image is hovered in some
+ *     popular browsers.
+ *   - attributes: Associative array of attributes to be placed in the img tag.
+ *
+ * @ingroup themeable
+ */
+function theme_assetbank_image_style($variables) {
+  // Determine the URL for the styled image.
+  $variables['path'] = assetbank_image_style_url($variables['assetbank_name'], $variables['asset_id'], $variables['style_name']);
+  $variables['attributes'] = array(
+    'class' => 'assetbank assetbank-image-style-' . $variables['style_name'],
+  );
+  return theme('image', $variables);
+}
+
+
+/**
+ * Gets an array of all instances and their settings.
+ *
+ * @return array
+ *   An array of styles keyed by the image style ID (abisid).
+ * @see assetbank_image_style_load()
+ */
+function assetbank_instances() {
+  $instances = &drupal_static(__FUNCTION__);
+
+  // Grab from cache or build the array.
+  if (!isset($instances)) {
+    $instances = variable_get('assetbank_image_instances');
+  }
+
+  return $instances;
+}
+
+
+/**
+ * Gets an array of image styles suitable for using as select list options.
+ *
+ * @return array
+ *   Array of image styles with the machine name as key and the label as value.
+ */
+function assetbank_instance_options() {
+  $instances = assetbank_instances();
+  $options = array();
+
+  foreach ($instances as $name => $instance) {
+    $options[$name] = $instance['label'];
+  }
+
+  return $options;
+}
+
+/**
+ * Loads a instance by name.
+ *
+ * May be used as a loader for menu items.
+ *
+ * @param string $name
+ *   The name of the instance.
+ *
+ * @return array
+ *   An image style array containing the following keys:
+ *   - "abiid": The unique image style ID.
+ *   - "name": The unique image style name.
+ *   - "url": The URL for this AssetBank
+ */
+function assetbank_instance_load($name = NULL) {
+  $instances = assetbank_instances();
+
+  // If retrieving by name.
+  if (isset($name) && isset($instances[$name])) {
+    $instances[$name]['name'] = $name;
+    return $instances[$name];
+  }
+
+  // Otherwise the instance was not found.
+  return FALSE;
+}
